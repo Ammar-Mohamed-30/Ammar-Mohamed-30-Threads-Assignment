@@ -1,4 +1,6 @@
+
 using OrderProcessing.Repositories;
+using OrderProcessing.Shared.Exceptions;
 using OrderProcessing.Shared.Logging;
 using OrderProcessing.Shared.Models;
 
@@ -33,20 +35,20 @@ public class CustomerService
 
         if (customer is null)
         {
-            Log.Error(
-                $"CustomerService -> Customer #{customerId} not found.");
+            string message = $"Customer #{customerId} not found";
 
-            throw new InvalidOperationException(
-                $"Customer #{customerId} not found.");
+            Log.Error($"CustomerService -> {message}.");
+
+            throw new CustomerNotFoundException(customerId);
         }
 
         if (!customer.IsActive)
         {
-            Log.Error(
-                $"CustomerService -> Customer #{customerId} is inactive.");
+            string message = $"Customer #{customerId} is inactive";
 
-            throw new InvalidOperationException(
-                $"Customer #{customerId} is inactive.");
+            Log.Error($"CustomerService -> {message}.");
+
+            throw new InvalidOperationException(message);
         }
 
         Log.Success(

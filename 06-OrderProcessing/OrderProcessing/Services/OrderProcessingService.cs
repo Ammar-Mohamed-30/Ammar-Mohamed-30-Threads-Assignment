@@ -68,11 +68,13 @@ public class OrderProcessingService
 			await _pricingService.CalculateTotalAsync(order, ct);
 
 			ct.ThrowIfCancellationRequested();
+            PaymentResult paymentResult =
+                await _paymentService.ProcessPaymentAsync(
+                    order.Id,
+                    order.TotalAmount,
+                    ct);
 
-			PaymentResult paymentResult =
-				await _paymentService.ProcessPaymentAsync(order, ct);
-
-			if (!paymentResult.Success)
+            if (!paymentResult.Success)
 			{
 				await _inventoryService.ReleaseStockAsync(order, ct);
 				stockReserved = false;
@@ -217,11 +219,9 @@ public class OrderProcessingService
 			{
 				try
 				{
-					await _paymentService.RefundAsync(
-						transactionId,
-						CancellationToken.None);
+                    await _paymentService.RefundAsync(transactionId);
 
-					order.FailureReason =
+                    order.FailureReason =
 						$"Database save failed after payment; payment {transactionId} refunded";
 				}
 				catch (Exception refundException)
@@ -280,10 +280,8 @@ public class OrderProcessingService
 		{
 			try
 			{
-				await _paymentService.RefundAsync(
-					transactionId,
-					CancellationToken.None);
-			}
+                await _paymentService.RefundAsync(transactionId);
+            }
 			catch (Exception ex)
 			{
 				Log.Error(

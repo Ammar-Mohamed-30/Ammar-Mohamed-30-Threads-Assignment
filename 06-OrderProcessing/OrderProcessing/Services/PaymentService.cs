@@ -1,47 +1,47 @@
+
 using OrderProcessing.Repositories;
 using OrderProcessing.Shared.Logging;
 using OrderProcessing.Shared.Models;
 
 namespace OrderProcessing.Services;
 
-public class PaymentService
+public class PaymentService : IPaymentGateway
 {
 	private readonly PaymentRepository _paymentRepository;
+	private readonly HashSet<int> _timeoutOrderIds;
+	private readonly HashSet<int> _declineOrderIds;
 
-	public PaymentService(PaymentRepository paymentRepository)
+	public PaymentService(
+		PaymentRepository paymentRepository,
+		IEnumerable<int>? timeoutOrderIds = null,
+		IEnumerable<int>? declineOrderIds = null)
 	{
 		_paymentRepository = paymentRepository;
+		_timeoutOrderIds = new HashSet<int>(
+			timeoutOrderIds ?? Array.Empty<int>());
+		_declineOrderIds = new HashSet<int>(
+			declineOrderIds ?? Array.Empty<int>());
 	}
 
 	public async Task<PaymentResult> ProcessPaymentAsync(
-		Order order,
+		int orderId,
+		decimal amount,
 		CancellationToken ct)
 	{
-		Log.Info($"PaymentService -> Authorizing payment for Order #{order.Id}...");
+		Log.Info($"PaymentGateway -> Authorizing Order #{orderId}...");
 		await Task.Delay(800, ct);
 
-		Log.Info($"PaymentService -> Running fraud check for Order #{order.Id}...");
+		Log.Info($"PaymentGateway -> Running fraud check for Order #{orderId}...");
 		await Task.Delay(500, ct);
 
 		ct.ThrowIfCancellationRequested();
 
-		if (order.Id == 5)
-		{
-			Log.Error($"PaymentService -> Payment timeout for Order #{order.Id}.");
-			throw new TimeoutException($"Payment timed out for Order #{order.Id}.");
-		}
-
-		Log.Info($"PaymentService -> Capturing payment for Order #{order.Id}...");
-		await Task.Delay(700, ct);
-
-		ct.ThrowIfCancellationRequested();
-
-		if (order.Id == 8)
+		if (_declineOrderIds.Contains(orderId))
 		{
 			PaymentTransaction declinedTransaction = new()
 			{
-				OrderId = order.Id,
-				Amount = order.TotalAmount,
+				OrderId = orderId,
+				Amount = amount,
 				Status = PaymentStatus.Declined,
 				TransactionId = null,
 				CreatedAt = DateTime.Now
@@ -49,7 +49,7 @@ public class PaymentService
 
 			await _paymentRepository.SaveAsync(declinedTransaction, ct);
 
-			Log.Error($"PaymentService -> Payment declined for Order #{order.Id}.");
+			Log.Error($"PaymentGateway -> Payment declined for Order #{orderId}.");
 
 			return new PaymentResult
 			{
@@ -60,13 +60,20 @@ public class PaymentService
 			};
 		}
 
+		Log.Info($"PaymentGateway -> Capturing payment for Order #{orderId}...");
+
+		int captureDelay = _timeoutOrderIds.Contains(orderId) ? 5000 : 700;
+		await Task.Delay(captureDelay, ct);
+
+		ct.ThrowIfCancellationRequested();
+
 		string transactionId =
 			"TXN-" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
 
 		PaymentTransaction capturedTransaction = new()
 		{
-			OrderId = order.Id,
-			Amount = order.TotalAmount,
+			OrderId = orderId,
+			Amount = amount,
 			Status = PaymentStatus.Captured,
 			TransactionId = transactionId,
 			CreatedAt = DateTime.Now
@@ -75,7 +82,7 @@ public class PaymentService
 		await _paymentRepository.SaveAsync(capturedTransaction, ct);
 
 		Log.Success(
-			$"PaymentService -> Payment captured for Order #{order.Id}. Transaction: {transactionId}");
+			$"PaymentGateway -> Payment captured for Order #{orderId}. Transaction: {transactionId}");
 
 		return new PaymentResult
 		{
@@ -86,15 +93,15 @@ public class PaymentService
 		};
 	}
 
-	public async Task RefundAsync(
-		string transactionId,
-		CancellationToken ct)
+	public async Task RefundAsync(string transactionId)
 	{
-		Log.Info($"PaymentService -> Starting refund for Transaction {transactionId}...");
-		await Task.Delay(300, ct);
+		Log.Info($"PaymentGateway -> Starting refund for {transactionId}...");
+		await Task.Delay(300);
 
-		await _paymentRepository.RefundAsync(transactionId, ct);
+		await _paymentRepository.RefundAsync(
+			transactionId,
+			CancellationToken.None);
 
-		Log.Success($"PaymentService -> Refund completed for Transaction {transactionId}.");
+		Log.Success($"PaymentGateway -> Refund completed for {transactionId}.");
 	}
 }

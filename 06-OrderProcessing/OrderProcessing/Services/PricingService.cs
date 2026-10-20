@@ -1,3 +1,4 @@
+
 using OrderProcessing.Repositories;
 using OrderProcessing.Shared.Exceptions;
 using OrderProcessing.Shared.Logging;
@@ -28,25 +29,25 @@ public class PricingService
         Order order,
         CancellationToken ct)
     {
-        Log.Info(
-            $"PricingService -> Order #{order.Id}: Loading products...");
+        List<Product> products =
+            await _productRepository.GetAllAsync(ct);
 
-        await Task.Delay(100, ct);
+        return CalculateSubTotal(order, products, ct);
+    }
 
-        Log.Info(
-            $"PricingService -> Order #{order.Id}: Calculating subtotal...");
-
-        await Task.Delay(100, ct);
-
+    private static decimal CalculateSubTotal(
+        Order order,
+        List<Product> products,
+        CancellationToken ct)
+    {
         decimal subTotal = 0m;
 
         foreach (OrderItem item in order.Items)
         {
             ct.ThrowIfCancellationRequested();
 
-            Product? product = await _productRepository.GetByIdAsync(
-                item.ProductId,
-                ct);
+            Product? product = products.FirstOrDefault(
+                p => p.Id == item.ProductId);
 
             if (product is null)
             {
@@ -79,16 +80,6 @@ public class PricingService
         Order order,
         CancellationToken ct)
     {
-        Log.Info(
-            $"PricingService -> Loading Customer #{order.CustomerId}...");
-
-        await Task.Delay(100, ct);
-
-        Log.Info(
-            $"PricingService -> Preparing total calculation for Order #{order.Id}...");
-
-        await Task.Delay(100, ct);
-
         Customer? customer = await _customerRepository.GetByIdAsync(
             order.CustomerId,
             ct);
@@ -98,19 +89,22 @@ public class PricingService
             throw new CustomerNotFoundException(order.CustomerId);
         }
 
-        await CalculateSubTotalAsync(order, ct);
+        List<Product> products =
+            await _productRepository.GetAllAsync(ct);
+
+        CalculateSubTotal(order, products, ct);
 
         Task<decimal> discountTask = _discountService.GetDiscountAsync(
             order,
             customer,
             ct);
 
-        List<Product> products = await _productRepository.GetAllAsync(ct);
-
         Task<decimal> shippingTask = _shippingService.CalculateShippingCostAsync(
             order,
             products,
             ct);
+
+        await Task.WhenAll(discountTask, shippingTask);
 
         order.Discount = await discountTask;
         order.ShippingCost = await shippingTask;

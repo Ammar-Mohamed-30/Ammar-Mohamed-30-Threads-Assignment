@@ -1,6 +1,7 @@
 ﻿
 using OrderProcessing.Phase1;
 using OrderProcessing.Phase2;
+using OrderProcessing.Phase3;
 
 namespace OrderProcessing;
 
@@ -18,13 +19,16 @@ internal static class Program
         };
 
         if (args.Length > 0 &&
-            args[0].Equals("--cancel-after", StringComparison.OrdinalIgnoreCase))
+            args[0].Equals(
+                "--cancel-after",
+                StringComparison.OrdinalIgnoreCase))
         {
             if (args.Length < 2 ||
                 !int.TryParse(args[1], out int milliseconds) ||
                 milliseconds < 0)
             {
-                Console.WriteLine("Usage: --cancel-after <milliseconds>");
+                Console.WriteLine(
+                    "Usage: --cancel-after <milliseconds>");
                 return;
             }
 
@@ -32,7 +36,9 @@ internal static class Program
         }
 
         string mode = args.Length > 0 &&
-                      !args[0].Equals("--cancel-after", StringComparison.OrdinalIgnoreCase)
+                      !args[0].Equals(
+                          "--cancel-after",
+                          StringComparison.OrdinalIgnoreCase)
             ? args[0].ToLowerInvariant()
             : "menu";
 
@@ -48,21 +54,37 @@ internal static class Program
                     await new Phase2Runner().RunAsync(cts.Token);
                     break;
 
+                case "phase3":
+                    await new Phase3Runner().RunAsync(cts.Token);
+                    break;
+
                 case "menu":
-                    Console.WriteLine("=== Order Processing System ===");
-                    Console.WriteLine("1. Phase 1 - Sequential Validation");
-                    Console.WriteLine("2. Phase 2 - Concurrent Processing");
+                    Console.WriteLine(
+                        "=== Order Processing System ===");
+                    Console.WriteLine(
+                        "1. Phase 1 - Sequential Validation");
+                    Console.WriteLine(
+                        "2. Phase 2 - Concurrent Processing");
+                    Console.WriteLine(
+                        "3. Phase 3 - Concurrent Order Processing");
                     Console.WriteLine("0. Exit");
                     Console.Write("Choose: ");
 
                     switch (Console.ReadLine())
                     {
                         case "1":
-                            await new Phase1Runner().RunAsync(cts.Token);
+                            await new Phase1Runner()
+                                .RunAsync(cts.Token);
                             break;
 
                         case "2":
-                            await new Phase2Runner().RunAsync(cts.Token);
+                            await new Phase2Runner()
+                                .RunAsync(cts.Token);
+                            break;
+
+                        case "3":
+                            await new Phase3Runner()
+                                .RunAsync(cts.Token);
                             break;
 
                         case "0":
@@ -72,16 +94,18 @@ internal static class Program
                             Console.WriteLine("Invalid choice.");
                             break;
                     }
+
                     break;
 
-                case "phase3":
                 case "phase4":
                 case "all":
-                    Console.WriteLine($"'{mode}' has not been implemented yet.");
+                    Console.WriteLine(
+                        $"'{mode}' has not been implemented yet.");
                     break;
 
                 default:
-                    Console.WriteLine("Usage: phase1 | phase2 | phase3 | phase4 | all");
+                    Console.WriteLine(
+                        "Usage: phase1 | phase2 | phase3 | phase4 | all");
                     break;
             }
         }
@@ -91,7 +115,8 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Unexpected error: {ex.Message}");
+            Console.WriteLine(
+                $"Unexpected error: {ex.Message}");
         }
     }
 }

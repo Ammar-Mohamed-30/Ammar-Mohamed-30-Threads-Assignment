@@ -1,16 +1,23 @@
+
 using OrderProcessing.Repositories;
+using OrderProcessing.Shared.Exceptions;
 using OrderProcessing.Shared.Logging;
 using OrderProcessing.Shared.Models;
 
 namespace OrderProcessing.Services;
 
-public class EmailService
+public class EmailService : IEmailService
 {
 	private readonly EmailRepository _emailRepository;
+	private readonly IReadOnlyDictionary<int, int> _failAttempts;
 
-	public EmailService(EmailRepository emailRepository)
+	public EmailService(
+		EmailRepository emailRepository,
+		IReadOnlyDictionary<int, int>? failAttempts = null)
 	{
 		_emailRepository = emailRepository;
+		_failAttempts = failAttempts
+			?? new Dictionary<int, int>();
 	}
 
 	public async Task SendConfirmationAsync(
@@ -38,18 +45,23 @@ public class EmailService
 
 			try
 			{
-				Log.Info($"EmailService -> Rendering email for Order #{order.Id}, attempt {attempt}...");
+				Log.Info(
+					$"EmailService -> Rendering email for Order #{order.Id}, attempt {attempt}...");
 				await Task.Delay(200, ct);
 
-				Log.Info($"EmailService -> Connecting to SMTP for Order #{order.Id}...");
+				Log.Info(
+					$"EmailService -> Connecting to SMTP for Order #{order.Id}...");
 				await Task.Delay(300, ct);
 
-				Log.Info($"EmailService -> Sending email for Order #{order.Id}...");
+				Log.Info(
+					$"EmailService -> Sending email for Order #{order.Id}...");
 				await Task.Delay(500, ct);
 
-				if (order.Id == 17 || (order.Id == 3 && attempt <= 2))
+				if (_failAttempts.TryGetValue(order.Id, out int failures)
+					&& attempt <= failures)
 				{
-					throw new Exception("Simulated SMTP failure");
+					throw new SmtpUnavailableException(
+						"Simulated SMTP failure");
 				}
 
 				email.Attempts = attempt;
@@ -58,7 +70,8 @@ public class EmailService
 
 				await _emailRepository.SaveAsync(email, ct);
 
-				Log.Success($"EmailService -> Confirmation email sent for Order #{order.Id}.");
+				Log.Success(
+					$"EmailService -> Confirmation email sent for Order #{order.Id}.");
 				return;
 			}
 			catch (OperationCanceledException)
@@ -70,7 +83,8 @@ public class EmailService
 				email.Attempts = attempt;
 				email.LastError = ex.Message;
 
-				Log.Error($"EmailService -> Attempt {attempt} failed for Order #{order.Id}: {ex.Message}");
+				Log.Error(
+					$"EmailService -> Attempt {attempt} failed for Order #{order.Id}: {ex.Message}");
 
 				if (attempt < maxAttempts)
 				{
@@ -81,7 +95,8 @@ public class EmailService
 						_ => 2000
 					};
 
-					Log.Info($"EmailService -> Retrying Order #{order.Id} in {delayMs} ms...");
+					Log.Info(
+						$"EmailService -> Retrying Order #{order.Id} in {delayMs} ms...");
 					await Task.Delay(delayMs, ct);
 				}
 			}
@@ -89,6 +104,7 @@ public class EmailService
 
 		await _emailRepository.SaveRetryAsync(email, ct);
 
-		Log.Error($"EmailService -> All {maxAttempts} attempts failed. Order #{order.Id} email queued for retry.");
+		Log.Error(
+			$"Email for Order #{order.Id} queued for retry later");
 	}
 }
