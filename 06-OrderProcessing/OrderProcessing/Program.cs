@@ -1,5 +1,6 @@
 ﻿
 using OrderProcessing.Phase1;
+using OrderProcessing.Phase2;
 
 namespace OrderProcessing;
 
@@ -43,9 +44,14 @@ internal static class Program
                     await new Phase1Runner().RunAsync(cts.Token);
                     break;
 
+                case "phase2":
+                    await new Phase2Runner().RunAsync(cts.Token);
+                    break;
+
                 case "menu":
                     Console.WriteLine("=== Order Processing System ===");
                     Console.WriteLine("1. Phase 1 - Sequential Validation");
+                    Console.WriteLine("2. Phase 2 - Concurrent Processing");
                     Console.WriteLine("0. Exit");
                     Console.Write("Choose: ");
 
@@ -54,15 +60,20 @@ internal static class Program
                         case "1":
                             await new Phase1Runner().RunAsync(cts.Token);
                             break;
+
+                        case "2":
+                            await new Phase2Runner().RunAsync(cts.Token);
+                            break;
+
                         case "0":
                             return;
+
                         default:
                             Console.WriteLine("Invalid choice.");
                             break;
                     }
                     break;
 
-                case "phase2":
                 case "phase3":
                 case "phase4":
                 case "all":
