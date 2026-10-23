@@ -2,6 +2,7 @@
 using OrderProcessing.Phase1;
 using OrderProcessing.Phase2;
 using OrderProcessing.Phase3;
+using OrderProcessing.Phase4;
 
 namespace OrderProcessing;
 
@@ -18,17 +19,20 @@ internal static class Program
             Console.WriteLine("\nCancellation requested...");
         };
 
-        if (args.Length > 0 &&
-            args[0].Equals(
+        int modeIndex = Array.FindIndex(
+            args,
+            arg => arg.Equals(
                 "--cancel-after",
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.OrdinalIgnoreCase));
+
+        if (modeIndex >= 0)
         {
-            if (args.Length < 2 ||
-                !int.TryParse(args[1], out int milliseconds) ||
+            if (modeIndex + 1 >= args.Length ||
+                !int.TryParse(args[modeIndex + 1], out int milliseconds) ||
                 milliseconds < 0)
             {
                 Console.WriteLine(
-                    "Usage: --cancel-after <milliseconds>");
+                    "Usage: dotnet run -- phase4 --cancel-after <milliseconds>");
                 return;
             }
 
@@ -58,6 +62,17 @@ internal static class Program
                     await new Phase3Runner().RunAsync(cts.Token);
                     break;
 
+                case "phase4":
+                    await new Phase4Runner().RunAsync(cts.Token);
+                    break;
+
+                case "all":
+                    await new Phase1Runner().RunAsync(cts.Token);
+                    await new Phase2Runner().RunAsync(cts.Token);
+                    await new Phase3Runner().RunAsync(cts.Token);
+                    await new Phase4Runner().RunAsync(cts.Token);
+                    break;
+
                 case "menu":
                     Console.WriteLine(
                         "=== Order Processing System ===");
@@ -67,6 +82,8 @@ internal static class Program
                         "2. Phase 2 - Concurrent Processing");
                     Console.WriteLine(
                         "3. Phase 3 - Concurrent Order Processing");
+                    Console.WriteLine(
+                        "4. Phase 4 - Scale-Up");
                     Console.WriteLine("0. Exit");
                     Console.Write("Choose: ");
 
@@ -87,6 +104,11 @@ internal static class Program
                                 .RunAsync(cts.Token);
                             break;
 
+                        case "4":
+                            await new Phase4Runner()
+                                .RunAsync(cts.Token);
+                            break;
+
                         case "0":
                             return;
 
@@ -95,12 +117,6 @@ internal static class Program
                             break;
                     }
 
-                    break;
-
-                case "phase4":
-                case "all":
-                    Console.WriteLine(
-                        $"'{mode}' has not been implemented yet.");
                     break;
 
                 default:
